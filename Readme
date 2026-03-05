@@ -1,0 +1,6 @@
+ClusterStorage/
+├── server/           # Servidor principal
+├── node/             # Clientes de nodo
+├── config/           # Configuraciones
+├── monitor/          # Monitoreo
+└── tests/            # Pruebas
