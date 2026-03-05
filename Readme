@@ -1,6 +1,297 @@
-ClusterStorage/
-├── server/           # Servidor principal
-├── node/             # Clientes de nodo
-├── config/           # Configuraciones
-├── monitor/          # Monitoreo
-└── tests/            # Pruebas
+# TCP Server Integration Guide
+## StorageCluster Monitor System
+
+Este documento explica como implementar el servidor TCP central del sistema de monitoreo de cluster e integrarlo correctamente con la base de datos y la API REST existente.
+
+## 1. Arquitectura del sistema
+
+El servidor TCP recibe metricas de los clientes y las guarda en SQL Server.
+
+```text
+Clientes (Laptops)
+    |
+    | TCP Socket
+    v
+Servidor TCP Central
+    |
+    | INSERT / UPDATE
+    v
+SQL Server Database
+    |
+    | REST API
+    v
+Dashboard Web
+```
+
+## 2. Configuracion de base de datos
+
+### Conexion SQL Server
+
+```ini
+Server=db43481.public.databaseasp.net
+Database=db43481
+User Id=db43481
+Password=******
+Encrypt=True
+TrustServerCertificate=True
+MultipleActiveResultSets=True
+```
+
+### Connection string
+
+```text
+Server=db43481.public.databaseasp.net;Database=db43481;User Id=db43481;Password=YOUR_PASSWORD;Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=True;
+```
+
+### Puerto SQL Server
+
+`1433`
+
+## 3. Puerto del servidor TCP
+
+El servidor debe escuchar en `TCP port 9000`.
+
+## 4. Tablas utilizadas por el servidor TCP
+
+### Nodos
+
+Representa cada laptop del sistema.
+
+| Campo | Descripcion |
+| --- | --- |
+| `id_nodo` | Identificador |
+| `nombre_nodo` | Nombre del cliente |
+| `ip` | IP del cliente |
+| `sistema_operativo` | Windows / Linux |
+| `estado` | Activo / No Reporta |
+| `ultimo_reporte` | Timestamp del ultimo reporte |
+
+### Discos
+
+Discos detectados en el cliente.
+
+| Campo | Descripcion |
+| --- | --- |
+| `id_disco` | Identificador |
+| `id_nodo` | Nodo dueno |
+| `nombre_disco` | Ejemplo: `C` |
+| `tipo_disco` | SSD o HDD |
+
+### TiposMetricas
+
+Define metricas existentes.
+
+| id | nombre |
+| --- | --- |
+| 1 | `disk_total` |
+| 2 | `disk_used` |
+| 3 | `disk_free` |
+| 4 | `disk_iops` |
+| 5 | `ram_total` |
+| 6 | `ram_used` |
+| 7 | `cpu_usage` |
+
+### Metricas
+
+Almacena los valores enviados por los clientes.
+
+| Campo | Descripcion |
+| --- | --- |
+| `id_metrica` | Identificador |
+| `id_nodo` | Nodo |
+| `id_disco` | Disco (si aplica) |
+| `id_tipo_metrica` | Tipo de metrica |
+| `valor` | Valor numerico |
+| `timestamp_cliente` | Hora enviada por el cliente |
+| `timestamp_servidor` | Hora registrada por el servidor |
+
+### Mensajes
+
+Comandos enviados desde el dashboard.
+
+| Campo | Descripcion |
+| --- | --- |
+| `id_mensaje` | Identificador |
+| `id_nodo` | Nodo |
+| `mensaje` | Comando |
+| `ack_recibido` | Confirmacion |
+
+## 5. Formato del mensaje recibido
+
+Los clientes deben enviar JSON con el siguiente formato:
+
+```json
+{
+  "nombre_nodo": "Laptop-1",
+  "ip": "192.168.1.10",
+  "sistema_operativo": "Windows",
+  "disco": {
+    "nombre": "C",
+    "tipo": "SSD"
+  },
+  "metricas": {
+    "disk_total": 512,
+    "disk_used": 200,
+    "disk_free": 312,
+    "ram_total": 16,
+    "ram_used": 8,
+    "cpu_usage": 25
+  },
+  "timestamp_cliente": "2026-03-05T20:10:00"
+}
+```
+
+## 6. Flujo que debe implementar el servidor TCP
+
+1. Cliente se conecta al servidor TCP.
+2. Cliente envia JSON con metricas.
+3. Servidor:
+   - Parsea JSON.
+   - Verifica o registra nodo.
+   - Verifica o registra disco.
+   - Inserta metricas.
+   - Actualiza `ultimo_reporte`.
+4. Servidor responde `ACK` o `ERROR`.
+
+## 7. Logica de insercion en SQL
+
+### 7.1 Registrar nodo si no existe
+
+```sql
+SELECT id_nodo
+FROM Nodos
+WHERE nombre_nodo = ?;
+```
+
+Si no existe:
+
+```sql
+INSERT INTO Nodos
+(nombre_nodo, ip, sistema_operativo, estado, ultimo_reporte)
+VALUES (?, ?, ?, 'Activo', GETDATE());
+```
+
+### 7.2 Actualizar ultimo reporte
+
+```sql
+UPDATE Nodos
+SET ultimo_reporte = GETDATE(),
+    estado = 'Activo'
+WHERE id_nodo = ?;
+```
+
+### 7.3 Registrar disco
+
+```sql
+SELECT id_disco
+FROM Discos
+WHERE id_nodo = ?
+  AND nombre_disco = ?;
+```
+
+Si no existe:
+
+```sql
+INSERT INTO Discos
+(id_nodo, nombre_disco, tipo_disco)
+VALUES (?, ?, ?);
+```
+
+### 7.4 Insertar metricas
+
+Ejemplo `disk_total`:
+
+```sql
+INSERT INTO Metricas
+(id_nodo, id_disco, id_tipo_metrica, valor, timestamp_cliente)
+VALUES
+(?, ?, 1, ?, ?);
+```
+
+Ejemplo `ram_total`:
+
+```sql
+INSERT INTO Metricas
+(id_nodo, id_tipo_metrica, valor, timestamp_cliente)
+VALUES
+(?, 5, ?, ?);
+```
+
+## 8. Respuesta del servidor TCP
+
+El servidor debe responder con:
+
+- `ACK` cuando procesa correctamente.
+- `ERROR` cuando hay fallo de validacion o insercion.
+
+## 9. Requisitos del servidor TCP
+
+Debe soportar:
+
+- Multiples clientes simultaneos.
+- Conexion persistente.
+- Procesamiento concurrente.
+
+Opciones recomendadas para implementacion:
+
+- Node.js (`net` module).
+- Python (`asyncio sockets`).
+- Go.
+
+## 10. Integracion con API REST
+
+El servidor TCP **no** debe exponer endpoints REST.
+
+Responsabilidad del servidor TCP:
+
+- Insertar datos en la base de datos.
+
+Responsabilidad de la API REST existente:
+
+- Consultar metricas.
+- Mostrar dashboard.
+- Generar estadisticas.
+
+## 11. Intervalo de envio recomendado
+
+Los clientes deben enviar metricas cada `10 segundos`.
+
+## 12. Ejemplo de flujo completo
+
+1. Cliente conecta.
+2. Cliente envia JSON.
+3. Servidor parsea.
+4. Servidor guarda en base de datos.
+5. Servidor responde `ACK`.
+6. Cliente espera siguiente intervalo.
+
+## 13. Prueba rapida
+
+1. Iniciar servidor TCP.
+2. Ejecutar cliente.
+3. Verificar datos:
+
+```sql
+SELECT TOP 10 *
+FROM Metricas
+ORDER BY timestamp_servidor DESC;
+```
+
+Si aparecen registros, la integracion es correcta.
+
+## 14. Notas importantes
+
+- Los timestamps del servidor se guardan automaticamente.
+- Las metricas deben usar `id_tipo_metrica`.
+- El servidor debe manejar errores de conexion.
+- El servidor debe validar JSON antes de insertar.
+
+## 15. Checklist de implementacion
+
+- Configurar conexion SQL Server con puerto `1433`.
+- Levantar servidor TCP en puerto `9000`.
+- Validar estructura JSON de entrada.
+- Aplicar logica `upsert` de nodo y disco.
+- Insertar metricas con `id_tipo_metrica` correcto.
+- Responder siempre `ACK` o `ERROR`.
+- Verificar inserciones con consulta `TOP 10` en `Metricas`.
