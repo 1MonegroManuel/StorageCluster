@@ -1,6 +1,168 @@
-ClusterStorage/
-├── server/           # Servidor principal
-├── node/             # Clientes de nodo
-├── config/           # Configuraciones
-├── monitor/          # Monitoreo
-└── tests/            # Pruebas
+# StorageCluster Monitor API
+
+API REST para un dashboard de monitoreo de clúster de almacenamiento distribuido.
+
+## Stack
+
+- Node.js
+- Express.js
+- SQL Server
+- mssql
+- cors
+- dotenv
+
+## Estructura del proyecto
+
+```
+src/
+	server.js
+	db.js
+	routes/
+		nodes.js
+		metrics.js
+		cluster.js
+		messages.js
+	controllers/
+```
+
+## Configuración de base de datos
+
+La API ahora soporta dos formas de conexión:
+
+1. `DB_CONNECTION_STRING` (recomendada)
+2. Variables separadas (`DB_SERVER`, `DB_DATABASE`, etc.)
+
+Ejemplo actual en `.env`:
+
+```
+PORT=3000
+DB_CONNECTION_STRING=Server=db43481.public.databaseasp.net;Database=db43481;User Id=db43481;Password=6s-Rc%L27Bj+;Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=True;
+```
+
+## Cómo correr localmente
+
+1. Instala dependencias:
+
+```bash
+npm install
+```
+
+2. Inicia el servidor:
+
+```bash
+npm start
+```
+
+3. API disponible en:
+
+```
+http://localhost:3000
+```
+
+## Endpoints
+
+### Nodes
+
+- `GET /nodes`
+	- Retorna todos los nodos con:
+		- `id_nodo`
+		- `nombre_nodo`
+		- `ip`
+		- `sistema_operativo`
+		- `estado`
+		- `ultimo_reporte`
+
+- `GET /nodes/:id`
+	- Retorna el detalle de un nodo e incluye sus discos (`Discos`).
+
+### Metrics
+
+- `GET /metrics/latest`
+	- Retorna métricas más recientes por nodo:
+		- `disk_total`
+		- `disk_used`
+		- `disk_free`
+		- `ram_total`
+		- `ram_used`
+		- `cpu_usage`
+
+- `GET /metrics/node/:id`
+	- Retorna métricas más recientes de un nodo específico.
+
+- `GET /metrics/history/:id`
+	- Retorna historial de métricas del nodo ordenado por `timestamp_servidor` descendente.
+
+### Cluster
+
+- `GET /cluster/summary`
+	- Retorna estadísticas agregadas del clúster:
+		- `total_disk_capacity`
+		- `total_used`
+		- `total_free`
+		- `utilization_percentage`
+		- `active_nodes`
+		- `total_nodes`
+
+### Messages
+
+- `POST /messages`
+	- Inserta un mensaje en `Mensajes`.
+	- Body ejemplo:
+
+```json
+{
+	"id_nodo": 1,
+	"mensaje": "Check disk space"
+}
+```
+
+- `GET /messages/:node_id`
+	- Retorna mensajes de un nodo.
+
+## Prueba rápida con cURL
+
+```bash
+curl http://localhost:3000/nodes
+curl http://localhost:3000/metrics/latest
+curl http://localhost:3000/cluster/summary
+```
+
+## Deploy en Render (Web Service)
+
+### 1) Subir repositorio
+
+- Sube este proyecto a GitHub.
+
+### 2) Crear servicio en Render
+
+1. Entra a Render y elige **New +** > **Web Service**.
+2. Conecta tu repo de GitHub.
+3. Configura:
+	 - **Environment**: `Node`
+	 - **Build Command**: `npm install`
+	 - **Start Command**: `npm start`
+
+### 3) Variables de entorno en Render
+
+En **Environment Variables** agrega:
+
+- `PORT=3000`
+- `DB_CONNECTION_STRING=Server=db43481.public.databaseasp.net;Database=db43481;User Id=db43481;Password=6s-Rc%L27Bj+;Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=True;`
+
+> Nota: en producción, si cambias credenciales de DB, solo actualiza esta variable en Render.
+
+### 4) Deploy
+
+- Pulsa **Create Web Service**.
+- Render construirá e iniciará la API.
+- Usa la URL generada por Render, por ejemplo:
+
+```
+https://tu-servicio.onrender.com/nodes
+```
+
+## Notas
+
+- CORS está habilitado para permitir conexión desde el dashboard React.
+- Todas las respuestas son JSON.
+- Manejo de errores centralizado en `src/server.js`.
