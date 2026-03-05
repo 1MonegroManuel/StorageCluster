@@ -1,6 +1,347 @@
-ClusterStorage/
-├── server/           # Servidor principal
-├── node/             # Clientes de nodo
-├── config/           # Configuraciones
-├── monitor/          # Monitoreo
-└── tests/            # Pruebas
+# Storage Cluster Monitoring Dashboard
+
+Frontend del sistema de monitoreo del **Storage Cluster** desarrollado para la práctica de **Sistemas Distribuidos – Implementación de Sockets TCP**.
+
+Este dashboard permite visualizar el estado de los servidores regionales que reportan métricas al nodo central.
+
+---
+
+# Arquitectura del Sistema
+
+El sistema completo funciona de la siguiente forma:
+
+Clientes (Servidores Regionales)
+↓ TCP Socket
+Servidor Central de Monitoreo
+↓
+Base de Datos
+↓
+API REST
+↓
+Dashboard Web (Frontend)
+
+El frontend **NO se conecta a los clientes ni al servidor TCP directamente**, solo consume información desde el **API REST**.
+
+---
+
+# Tecnologías recomendadas
+
+Se puede usar cualquier framework web.
+
+Recomendado:
+
+* React
+* Vite
+* Axios
+* Recharts o Chart.js
+* TailwindCSS (opcional)
+
+Crear proyecto:
+
+```
+npm create vite@latest dashboard
+cd dashboard
+npm install
+npm install axios recharts
+```
+
+---
+
+# API REST
+
+El dashboard obtiene todos los datos desde el API.
+
+Base URL:
+
+```
+http://localhost:3000
+```
+
+Endpoints disponibles:
+
+---
+
+## Obtener nodos del cluster
+
+```
+GET /nodes
+```
+
+Devuelve todos los servidores registrados.
+
+Ejemplo:
+
+```
+[
+ {
+   "id_nodo":1,
+   "nombre_nodo":"server-cocha",
+   "ip":"192.168.0.10",
+   "sistema_operativo":"Linux",
+   "estado":"Activo",
+   "ultimo_reporte":"2026-03-05T12:30:00"
+ }
+]
+```
+
+---
+
+## Obtener métricas actuales
+
+```
+GET /metrics/latest
+```
+
+Devuelve métricas más recientes por nodo.
+
+Ejemplo:
+
+```
+[
+ {
+   "nombre_nodo":"server-cocha",
+   "disk_total":500,
+   "disk_used":200,
+   "disk_free":300,
+   "ram_total":16,
+   "ram_used":8,
+   "cpu_usage":25
+ }
+]
+```
+
+---
+
+## Historial de métricas
+
+```
+GET /metrics/history/:id
+```
+
+Ejemplo:
+
+```
+GET /metrics/history/1
+```
+
+Devuelve métricas históricas del nodo.
+
+---
+
+## Resumen del cluster
+
+```
+GET /cluster/summary
+```
+
+Devuelve métricas globales del cluster.
+
+Ejemplo:
+
+```
+{
+ "total_disk_capacity":2000,
+ "total_used":900,
+ "total_free":1100,
+ "utilization_percentage":45,
+ "active_nodes":7,
+ "total_nodes":9
+}
+```
+
+---
+
+# Funcionalidades que debe tener el Dashboard
+
+Según los requerimientos de la práctica.
+
+---
+
+# 1 Lista de servidores
+
+El sistema debe mostrar los **9 servidores del cluster**.
+
+Datos por servidor:
+
+* Nombre del nodo
+* Dirección IP
+* Sistema operativo
+* Estado
+
+Estados posibles:
+
+* Activo
+* No Reporta
+
+Un nodo pasa a **No Reporta** cuando no envía métricas dentro del tiempo configurado.
+
+---
+
+# 2 Métricas por nodo
+
+Cada servidor debe mostrar:
+
+* Capacidad total del disco
+* Espacio usado
+* Espacio libre
+* Uso de CPU
+* Uso de RAM
+
+Ejemplo visual:
+
+Servidor: server-cocha
+
+CPU: 25%
+RAM: 8 / 16 GB
+Disco: 200 / 500 GB
+
+---
+
+# 3 Totales del Cluster
+
+El dashboard debe mostrar métricas globales:
+
+* Capacidad total del cluster
+* Espacio usado total
+* Espacio libre total
+* Porcentaje de utilización
+* Número de nodos activos
+
+Estos datos vienen del endpoint:
+
+```
+GET /cluster/summary
+```
+
+---
+
+# 4 Indicadores de estado
+
+Ejemplo visual:
+
+🟢 Activo
+🔴 No Reporta
+
+Un nodo está **Activo** cuando sigue enviando métricas.
+
+---
+
+# 5 Gráficos de uso
+
+Mostrar gráficos por nodo:
+
+* CPU en el tiempo
+* Uso de disco
+* Uso de RAM
+
+Datos obtenidos de:
+
+```
+GET /metrics/history/:id
+```
+
+---
+
+# 6 Auto Refresh Parametrizable
+
+El dashboard debe actualizarse automáticamente.
+
+El usuario debe poder seleccionar el intervalo de actualización.
+
+Opciones recomendadas:
+
+* 5 segundos
+* 10 segundos
+* 30 segundos
+* 60 segundos
+
+Ejemplo de selector:
+
+```
+Refresh interval:
+
+[5s] [10s] [30s] [60s]
+```
+
+Cada intervalo el frontend debe volver a consultar:
+
+```
+GET /nodes
+GET /metrics/latest
+GET /cluster/summary
+```
+
+---
+
+# Ejemplo conceptual en React
+
+```
+useEffect(() => {
+
+ const interval = setInterval(() => {
+   loadData();
+ }, refreshInterval);
+
+ return () => clearInterval(interval);
+
+}, [refreshInterval]);
+```
+
+---
+
+# Estructura recomendada del proyecto
+
+```
+dashboard
+│
+├── src
+│
+├── components
+│   ├── NodeCard.jsx
+│   ├── ClusterSummary.jsx
+│   ├── MetricsChart.jsx
+│
+├── pages
+│   └── Dashboard.jsx
+│
+├── services
+│   └── api.js
+│
+├── App.jsx
+└── main.jsx
+```
+
+---
+
+# Ejemplo servicio API
+
+Crear archivo:
+
+```
+src/services/api.js
+```
+
+Contenido:
+
+```
+import axios from "axios";
+
+const api = axios.create({
+ baseURL: "http://localhost:3000"
+});
+
+export default api;
+```
+
+---
+
+# Objetivo del Dashboard
+
+El dashboard permite:
+
+* visualizar el estado de todos los servidores
+* monitorear capacidad de almacenamiento
+* detectar nodos que no reportan
+* observar el estado global del cluster
+
+Forma parte del sistema distribuido basado en **Sockets TCP para recolección de métricas** y **API REST para visualización de datos**.
