@@ -1,6 +1,268 @@
-ClusterStorage/
-├── server/           # Servidor principal
-├── node/             # Clientes de nodo
-├── config/           # Configuraciones
-├── monitor/          # Monitoreo
-└── tests/            # Pruebas
+# Storage Cluster – Cliente de Monitoreo
+
+Este proyecto corresponde al **cliente del sistema de monitoreo distribuido**.
+
+El cliente se ejecuta en cada **servidor regional (laptop)** y se encarga de:
+
+* Obtener métricas del sistema
+* Simular operaciones de almacenamiento
+* Enviar métricas al **Servidor Central** mediante **Sockets TCP**
+
+---
+
+# Arquitectura del Sistema
+
+El sistema funciona de la siguiente forma:
+
+Servidor Regional (Cliente)
+↓ TCP Socket
+Servidor Central de Monitoreo
+↓
+Base de Datos
+↓
+API REST
+↓
+Dashboard Web
+
+Cada cliente envía periódicamente su estado al **Servidor Central**.
+
+---
+
+# Tecnologías recomendadas
+
+Lenguaje recomendado:
+
+* Python 3.11
+
+Librerías sugeridas:
+
+* socket
+* psutil
+* json
+* time
+* random
+
+Instalar dependencias:
+
+```id="m0xydg"
+pip install psutil
+```
+
+---
+
+# Funcionalidad del Cliente
+
+El cliente debe:
+
+1. Obtener métricas del sistema
+2. Simular operaciones de disco
+3. Conectarse al servidor TCP
+4. Enviar datos periódicamente
+5. Esperar confirmación del servidor
+
+---
+
+# Métricas que debe enviar
+
+Cada cliente debe enviar:
+
+* nombre del nodo
+* dirección IP
+* sistema operativo
+* capacidad total del disco
+* espacio usado
+* espacio libre
+* RAM total
+* RAM usada
+* uso de CPU
+* IOPS simuladas
+* timestamp
+
+---
+
+# Ejemplo de datos enviados
+
+El cliente debe enviar un objeto JSON como este:
+
+```id="a3ty8b"
+{
+ "nombre_nodo": "server-cocha",
+ "ip": "192.168.0.12",
+ "sistema_operativo": "Windows 11",
+
+ "metricas": {
+  "disk_total": 512,
+  "disk_used": 220,
+  "disk_free": 292,
+  "ram_total": 16,
+  "ram_used": 9,
+  "cpu_usage": 35,
+  "iops": 120
+ },
+
+ "timestamp": "2026-03-05T12:30:00"
+}
+```
+
+---
+
+# Obtener métricas del sistema
+
+### Disco
+
+Ejemplo conceptual:
+
+```id="0tdid5"
+psutil.disk_usage('/')
+```
+
+Retorna:
+
+* total
+* used
+* free
+
+---
+
+### RAM
+
+```id="xg2vmi"
+psutil.virtual_memory()
+```
+
+---
+
+### CPU
+
+```id="k4abm0"
+psutil.cpu_percent(interval=1)
+```
+
+---
+
+# Simulación de IOPS
+
+Las IOPS se pueden simular con valores aleatorios.
+
+Ejemplo:
+
+```id="5zztqe"
+iops = random.randint(50,200)
+```
+
+Esto simula actividad del sistema de almacenamiento.
+
+---
+
+# Conexión al Servidor TCP
+
+El cliente debe conectarse al servidor central.
+
+Configuración ejemplo:
+
+```id="43w1sg"
+SERVER_IP = "192.168.1.100"
+SERVER_PORT = 5000
+```
+
+Crear conexión:
+
+```id="m4o9c5"
+socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+```
+
+---
+
+# Envío de datos
+
+Los datos deben enviarse en formato JSON.
+
+Ejemplo:
+
+```id="h4e52c"
+data = json.dumps(metrics)
+
+client_socket.send(data.encode())
+```
+
+---
+
+# Confirmación del servidor
+
+El servidor central puede responder con un mensaje:
+
+```id="avh8cl"
+ACK
+```
+
+El cliente debe esperar esta confirmación antes de enviar el siguiente paquete.
+
+---
+
+# Frecuencia de envío
+
+El cliente debe enviar métricas cada cierto tiempo.
+
+Ejemplo:
+
+* cada **5 segundos**
+* cada **10 segundos**
+
+Ejemplo de loop:
+
+```id="6t0pzk"
+while True:
+
+ send_metrics()
+
+ time.sleep(10)
+```
+
+---
+
+# Manejo de errores
+
+El cliente debe manejar:
+
+* pérdida de conexión
+* reconexión automática
+* errores de red
+
+Ejemplo conceptual:
+
+```id="hyyzo7"
+try:
+ connect_to_server()
+
+except:
+ reconnect()
+```
+
+---
+
+# Identificación del Nodo
+
+Cada cliente debe identificarse con un nombre único.
+
+Ejemplo:
+
+```id="n9e6ck"
+server-cocha
+server-lapaz
+server-santa-cruz
+```
+
+Esto permitirá al servidor central registrar correctamente las métricas.
+
+---
+
+# Objetivo del Cliente
+
+El cliente permite:
+
+* monitorear servidores regionales
+* reportar métricas del sistema
+* simular actividad de almacenamiento
+* alimentar el sistema de monitoreo central
+
+Forma parte del sistema distribuido basado en **Sockets TCP para comunicación entre nodos**.
